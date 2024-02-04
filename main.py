@@ -285,4 +285,8 @@ def main(n_iter: int = 100):
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument('-n', '--n_iters', type=int, default=100)
+    args = p.parse_args()
+    main(args.n_iters)
