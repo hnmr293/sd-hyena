@@ -7,6 +7,8 @@ import einops
 import xformers
 import xformers.ops
 
+from safari import HyenaOperator
+
 @dataclasses.dataclass
 class Profs:
     time: list[float] = dataclasses.field(default_factory=list)
@@ -149,16 +151,26 @@ class AttentionSDP(Attention):
             
             return out
 
+class Hyena(HyenaOperator):
+    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3) -> None:
+        super().__init__(d_model=input_dim, l_max=max_len, order=order, filter_order=filter_order, num_heads=num_heads, inner_factor=inner_factor, num_blocks=num_blocks, short_filter_order=short_filter_order)
+    
+    def forward(self, x, ctx=None):
+        assert ctx is None
+        return super().forward(x)
+
 
 def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     attn = Attention(d, d, d, 8)
     attn_x = AttentionXFormers(d, d, d, 8)
     attn_sdp = AttentionSDP(d, d, d, 8)
+    hyena = Hyena(d, 128*128)
 
     mods = {
         'original': attn,
         'xformers': attn_x,
         'sdp': attn_sdp,
+        'hyena': hyena,
     }
     
     def test(mod):
@@ -206,7 +218,7 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     return results
 
 
-def main(n_iter: int = 10):
+def main(n_iter: int = 100):
     device = 'cuda:0'
     use_fp16 = True
 
