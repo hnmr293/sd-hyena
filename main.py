@@ -11,6 +11,7 @@ import xformers.ops
 class Profs:
     time: list[float] = dataclasses.field(default_factory=list)
     memory: list[int] = dataclasses.field(default_factory=list)
+    n_params: int = 0
 
 def mean_and_stdev(xs: list):
     mean = statistics.fmean(xs)
@@ -39,6 +40,12 @@ def cuda_profiler(device='cuda'):
     obj['memory'] = torch.cuda.max_memory_allocated(device)
 
 
+def n_params(mod: torch.nn.Module):
+    n = 0
+    for param in mod.parameters():
+        if param.requires_grad:
+            n += param.numel()
+    return n
 
 
 class Attention(torch.nn.Module):
@@ -187,6 +194,8 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
             test(mod)
 
         profs = Profs()
+        profs.n_params = n_params(mod)
+
         for _ in range(n_iter):
             _, prof = test(mod)
             profs.time.append(prof['time'])
@@ -225,6 +234,12 @@ def main(n_iter: int = 10):
         in results.items()
     }
 
+    n_param = {
+        name: prof.n_params
+        for name, prof
+        in results.items()
+    }
+
     names = list(results.keys())
 
     xlabel = 'attn kind'
@@ -240,7 +255,11 @@ def main(n_iter: int = 10):
     time_df, time_means = create_df(time, xlabel, ylabel_time)
     mem_df, mem_means = create_df(memory, xlabel, ylabel_mem)
     
-    fig, (ax1, ax2) = plt.subplots(ncols=2)
+    fig, (ax0, ax1, ax2) = plt.subplots(ncols=3)
+    
+    ax0.plot(names, n_param.values(), marker='o', linestyle='')
+    ax0.set_xlabel(xlabel)
+    ax0.set_ylabel('parameters')
     
     sns.stripplot(ax=ax1, data=time_df, x=xlabel, y=ylabel_time, marker='$\circ$', alpha=0.5, log_scale=10)
     ax1.plot(names, time_means, color='black', marker='_', markersize=20, linestyle='')
@@ -248,14 +267,8 @@ def main(n_iter: int = 10):
     sns.stripplot(ax=ax2, data=mem_df, x=xlabel, y=ylabel_mem, marker='$\circ$', alpha=0.5)
     ax2.plot(names, mem_means, color='black', marker='_', markersize=20, linestyle='')
 
+    fig.tight_layout()
     plt.show()
-    
-    #for name, prof in results.items():
-    #    print(name)
-    #    time_mean, time_stdev = mean_and_stdev(prof.time)
-    #    mem_mean, mem_stdev = mean_and_stdev(prof.memory)
-    #    print(f'  time   = {time_mean:.3f} ({time_stdev:.3f}) ms')
-    #    print(f'  memory = {mem_mean/1024/1024:.3f} ({mem_stdev/1024/1024:.3f}) MiB')
 
 
 
