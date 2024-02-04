@@ -186,6 +186,14 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
             x = x.to(device=device)
             mod = mod.to(device=device)
             
+            if mod == attn and 128*128 < wh:
+                return x, None
+            
+            if mod == hyena and use_fp16:
+                if 2 <= wh and (wh & (wh - 1)) != 0:
+                    # cuFFT does not support this manner
+                    return x, None
+            
             with cuda_profiler(device) as prof:
                 x = mod(x)
             
@@ -194,7 +202,7 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     # test shape and dtypes
     for name, mod in mods.items():
         x, _ = test(mod)
-        assert x.shape == (b, wh, d), f'{name}, {x.shape}'
+        assert x.shape == (b, wh, d), f'{name}, {x.shape}, expected = ({b}, {wh}, {d})'
         assert x.dtype == torch.float16 if use_fp16 else torch.float32, f'{name}, {x.dtype}'
         del x
     
@@ -210,6 +218,8 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
 
         for _ in range(n_iter):
             _, prof = test(mod)
+            if prof is None:
+                continue
             profs.time.append(prof['time'])
             profs.memory.append(prof['memory'])
         
