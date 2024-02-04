@@ -228,7 +228,7 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     return results
 
 
-def main(n_iter: int = 100):
+def main_performance(ax0, ax1, ax2, n_iter: int = 100):
     device = 'cuda:0'
     use_fp16 = True
 
@@ -239,11 +239,9 @@ def main(n_iter: int = 100):
 
     results = run(b, w*h, d, device, use_fp16, n_iter=n_iter)
 
-    # create graphs
     import pandas as pd
-    import matplotlib.pyplot as plt
     import seaborn as sns
-
+    
     time = {
         name: prof.time
         for name, prof
@@ -277,8 +275,6 @@ def main(n_iter: int = 100):
     time_df, time_means = create_df(time, xlabel, ylabel_time)
     mem_df, mem_means = create_df(memory, xlabel, ylabel_mem)
     
-    fig, (ax0, ax1, ax2) = plt.subplots(ncols=3)
-    
     ax0.plot(names, n_param.values(), marker='o', linestyle='')
     ax0.set_xlabel(xlabel)
     ax0.set_ylabel('parameters')
@@ -288,6 +284,53 @@ def main(n_iter: int = 100):
 
     sns.stripplot(ax=ax2, data=mem_df, x=xlabel, y=ylabel_mem, marker='$\circ$', alpha=0.5)
     ax2.plot(names, mem_means, color='black', marker='_', markersize=20, linestyle='')
+
+def main_performance2(ax0, ax1, ax2, n_iter: int = 10):
+    device = 'cuda:0'
+    use_fp16 = True
+
+    b = 1
+    d = 320
+    ws = (256, 512, 768, 1024, 1280, 2048, 4096)
+
+    results = {}
+    for w in ws:
+        lw = w // 8
+        lh = lw
+        r = run(b, lw*lh, d, device, use_fp16, n_iter)
+        results[w] = r
+
+    import pandas as pd
+    import seaborn as sns
+    
+    rows = []
+    for w, series in results.items():
+        for attn_kind, prof in series.items():
+            for t, m in zip(prof.time, prof.memory):
+                rows.append([w, attn_kind, prof.n_params, t, m/1024/1024])
+    df = pd.DataFrame(rows, columns=['image size', 'attn kind', 'parameters', 'time (ms)', 'VRAM (MiB)'])
+    mean_df = df.groupby(['image size', 'attn kind']).mean()
+
+    names = df['attn kind'].unique()
+    
+    sns.lineplot(ax=ax0, data=df[['image size', 'attn kind', 'parameters']].drop_duplicates(), x='image size', y='parameters', markers=True, marker='o', dashes=False, hue='attn kind', hue_order=names)
+    
+    sns.scatterplot(ax=ax1, data=df, x='image size', y='time (ms)', marker='$\circ$', alpha=0.5, hue='attn kind', hue_order=names)
+    sns.lineplot(ax=ax1, data=mean_df, x='image size', y='time (ms)', errorbar=None, markers=False, linewidth=1, hue='attn kind', hue_order=names)
+    ax1.set(yscale='log')
+    
+    sns.scatterplot(ax=ax2, data=df, x='image size', y='VRAM (MiB)', marker='$\circ$', alpha=0.5, hue='attn kind', hue_order=names)
+    sns.lineplot(ax=ax2, data=mean_df, x='image size', y='VRAM (MiB)', errorbar=None, markers=False, linewidth=1, hue='attn kind', hue_order=names)
+
+def main(n_iter: int = 100):
+    # create graphs
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(nrows=2, ncols=3)
+    (ax0, ax1, ax2), (ax3, ax4, ax5) = axes
+    
+    main_performance2(ax0, ax1, ax2, max(n_iter//10, 5))
+    main_performance(ax3, ax4, ax5, n_iter)
 
     fig.tight_layout()
     plt.show()
