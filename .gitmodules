@@ -1,0 +1,6 @@
+[submodule "stablediffusion"]
+	path = stablediffusion
+	url = https://github.com/Stability-AI/stablediffusion.git
+[submodule "safari"]
+	path = safari
+	url = https://github.com/HazyResearch/safari.git
