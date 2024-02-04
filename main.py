@@ -164,7 +164,7 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     attn = Attention(d, d, d, 8)
     attn_x = AttentionXFormers(d, d, d, 8)
     attn_sdp = AttentionSDP(d, d, d, 8)
-    hyena = Hyena(d, 128*128)
+    hyena = Hyena(d, wh)
 
     mods = {
         'original': attn,
