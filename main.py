@@ -211,15 +211,19 @@ def run(b: int, wh: int, d: int, device, use_fp16: bool, n_iter: int = 100):
     for name, mod in mods.items():
         # warm-up
         for _ in range(10):
-            test(mod)
+            x, _ = test(mod)
+            del x
 
         profs = Profs()
         profs.n_params = n_params(mod)
 
         for _ in range(n_iter):
-            _, prof = test(mod)
+            x, prof = test(mod)
+            del x
+            
             if prof is None:
                 continue
+            
             profs.time.append(prof['time'])
             profs.memory.append(prof['memory'])
         
