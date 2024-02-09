@@ -5,6 +5,7 @@ einops
 pandas
 matplotlib
 seaborn
+tensorboard
 
 # for WSL environment
 #PyQt5
