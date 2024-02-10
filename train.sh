@@ -1,24 +1,16 @@
 #! /usr/bin/env bash
 
-bs=(2 4 8 16)
-lr=('1e-1' '1e-2' '1e-3' '1e-4')
-
-for b in "${bs[@]}"
-do
-    for r in "${lr[@]}"
-    do
-
-python train.py \
+b=32
+r="1e-6"
+python train2.py \
+    --teacher_model='../models/evbp-anime-half.safetensors' \
     --batch_size="${b}" \
     --lr="${r}" \
-    --n_epochs=50 \
+    --n_steps=5000 \
     --channels=320 \
     --width=64 \
     --height=64 \
-    --save_every_n_epochs=10 \
-    --log_dir='logs' \
-    --out_dir="out/out_${b}_${r}" \
-    --name_format="IN01_${b}_${r}_{e:03d}"
-
-    done
-done
+    --save_every_n_steps=500 \
+    --log_dir='logs/out3' \
+    --out_dir="out/out3/${b}_${r}" \
+    --name_format="IN01_${b}_${r}_{s:05d}"
