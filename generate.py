@@ -5,6 +5,26 @@ import safetensors.torch
 from mods import HyenaProcessor
 
 
+ATTN_MAP = {
+    # attn: down_blocks[i].attentions[j].transformer_blocks[k]
+    'IN01': [0, 0, 0],
+    'IN02': [0, 1, 0],
+    'IN04': [1, 0, 0],
+    'IN05': [1, 1, 0],
+    'IN07': [2, 0, 0],
+    'IN08': [2, 1, 0],
+    'M00':  [0, 0, 0],
+    'OUT03': [1, 0, 0],
+    'OUT04': [1, 1, 0],
+    'OUT05': [1, 2, 0],
+    'OUT06': [2, 0, 0],
+    'OUT07': [2, 1, 0],
+    'OUT08': [2, 2, 0],
+    'OUT09': [3, 0, 0],
+    'OUT10': [3, 1, 0],
+    'OUT11': [3, 2, 0],
+}
+
 def load_model(model_path: str):
     pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
         model_path,
@@ -18,13 +38,25 @@ def load_model(model_path: str):
 
     return pipe
 
-def replace_hyena(unet, hyena_path: str):
+def replace_hyena(target: str, unet, hyena_path: str):
     hyena = HyenaProcessor(320, 64*64).half()
     safetensors.torch.load_model(hyena, hyena_path)
     hyena = hyena.to('cuda')
     
-    IN01 = unet.down_blocks[0].attentions[0].transformer_blocks[0]
-    IN01.attn1.processor = hyena
+    target = target.upper()
+    blocks = None
+    if target.startswith('IN'):
+        blocks = unet.down_blocks
+    elif target.startswith('M'):
+        blocks = [unet.mid_block]
+    elif target.startswith('OUT'):
+        blocks = unet.up_blocks
+    else:
+        raise ValueError(f'unknown target: {target}')
+    
+    b, a, t = ATTN_MAP[target]
+    mod = blocks[b].attentions[a].transformer_blocks[t]
+    mod.attn1.processor = hyena
 
 
 def generate(iteration: int, pipe, gen_args: dict, seed: int):
@@ -47,6 +79,7 @@ if __name__ == '__main__':
     
     p = argparse.ArgumentParser()
     p.add_argument('-m', '--model', type=str, required=True)
+    p.add_argument('-t', '--target', type=str, choices=['IN01', 'IN02', 'IN04', 'IN05', 'IN07', 'IN08', 'M00', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'OUT09', 'OUT10', 'OUT11'], default='IN01')
     p.add_argument('-y', '--hyena', type=str, default='')
     p.add_argument('-p', '--prompt', type=str, required=True)
     p.add_argument('-q', '--negative_prompt', type=str, default='')
@@ -85,21 +118,17 @@ if __name__ == '__main__':
     pipe = load_model(args.model)
     pipe = pipe.to('cuda')
     
-    def hyena_set():
-        for b in [2, 4, 8, 16]:
-            for lr in ['1e-1', '1e-2', '1e-3', '1e-4']:
-                for e in [10, 20, 30, 40, 50]:
-                    yield b, lr, e
-    
-    for b, lr, e in hyena_set():
-        hyena_path = f'out/out_{b}_{lr}/IN01_{b}_{lr}_{e:03d}.safetensors'
-        replace_hyena(pipe.unet, hyena_path)
+    for k, hyena_path in enumerate(args.hyena.split(',')):
+        hyena_path = hyena_path.strip()
+        if len(hyena_path) == 0:
+            continue
+        replace_hyena(args.target, pipe.unet, hyena_path)
         
         images = generate(args.iteration, pipe, gen_args, args.seed)
-    
+        
         for i, imgs in enumerate(images):
             for j, image in enumerate(imgs):
                 n = i * args.num_images + j
-                #name = args.name_format.format(n=n, b=i, i=j)
-                path = f'{args.out_dir}/{b}_{lr}_{e:03d}_{n}.png'
+                name = args.name_format.format(n=n, b=i, i=j, h=k)
+                path = f'{args.out_dir}/{name}.png'
                 image.save(path)
