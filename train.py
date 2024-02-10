@@ -1,11 +1,11 @@
-import time
-import datetime
+import dataclasses
 
 import numpy
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import tqdm
+import safetensors.torch
 
 from mods import Hyena
 
@@ -47,7 +47,37 @@ class MyDataset(torch.utils.data.Dataset):
         return i, o
 
 
-def train(mod: torch.nn.Module, batch_size: int, lr: float, epochs: int, dataset: MyDataset):
+@dataclasses.dataclass
+class TrainConf:
+    batch_size: int
+    lr: float
+    n_epochs: int
+    save_every_n_epochs: int
+    log_dir: str
+    out_dir: str
+    name_format: str
+
+
+def save(mod: torch.nn.Module, path: str, n_epoch: int, n_step: int):
+    meta = {
+        'epoch': n_epoch,
+        'global_step': n_step,
+    }
+    meta = {
+        str(k): str(v)
+        for k, v
+        in meta.items()
+    }
+    safetensors.torch.save_model(mod, path, meta)
+
+def train(mod: torch.nn.Module, conf: TrainConf, dataset: MyDataset, logger: SummaryWriter):
+    batch_size = conf.batch_size
+    lr = conf.lr
+    epochs = conf.n_epochs
+    save_epoch = conf.save_every_n_epochs
+    out_dir = conf.out_dir
+    fmt = conf.name_format
+    
     mod = mod.to('cuda')
     mod.requires_grad_(True)
     mod.train()
@@ -62,9 +92,6 @@ def train(mod: torch.nn.Module, batch_size: int, lr: float, epochs: int, dataset
     
     pbar = tqdm.tqdm(range(epochs * len(loader)), smoothing=0, desc='steps')
     
-    now = datetime.datetime.now().strftime('%Y%m%d')
-    logger = SummaryWriter(log_dir=f'logs/{now}.{int(time.time())}')
-    
     global_steps = 0
 
     for epoch in range(epochs):
@@ -75,15 +102,12 @@ def train(mod: torch.nn.Module, batch_size: int, lr: float, epochs: int, dataset
             x = x.to('cuda')
             y = y.to('cuda')
 
-            #x = torch.sigmoid(x)
             y_pred = mod(x)
             loss = torch.nn.functional.mse_loss(y_pred, y, reduction='none')
             loss = loss.mean()
             
             loss.backward()
 
-            #torch.nn.utils.clip_grad_norm_(params, 1.0)
-            
             optimizer.step()
             lr_sched.step()
             
@@ -92,9 +116,67 @@ def train(mod: torch.nn.Module, batch_size: int, lr: float, epochs: int, dataset
             
             pbar.update()
             global_steps += 1
+        
+        if (epoch == epochs - 1) or (0 < save_epoch and (epoch + 1) % save_epoch == 0):
+            outname = fmt.format(e=epoch+1, s=global_steps)
+            path = f'{out_dir}/{outname}.safetensors'
+            save(mod, path, epoch+1, global_steps)
+
 
 if __name__ == '__main__':
-    hyena = Hyena(320, 64*64)
+    import os
+    import argparse
+    import time
+    import datetime
+    
+    p = argparse.ArgumentParser()
+    p.add_argument('-b', '--batch_size', type=int, default=8)
+    p.add_argument('-r', '--lr', type=float, default=1e-3)
+    p.add_argument('-n', '--n_epochs', type=int, default=50)
+    p.add_argument('-c', '--channels', type=int, default=320)
+    p.add_argument('-W', '--width', type=int, default=64)
+    p.add_argument('-H', '--height', type=int, default=64)
+    p.add_argument('-s', '--save_every_n_epochs', type=int, default=1)
+    p.add_argument('-l', '--log_dir', type=str, default='logs')
+    p.add_argument('-o', '--out_dir', type=str, default='out')
+    p.add_argument('-f', '--name_format', type=str, default='Hyena-{e:05d}-{s:05d}')
+    args = p.parse_args()
+    
+    d = args.channels
+    w = args.width
+    h = args.height
+    
+    b = args.batch_size
+    lr = args.lr
+    n = args.n_epochs
+    s = args.save_every_n_epochs
+
+    now = datetime.datetime.now().strftime('%Y%m%d')
+    log_dir=f'{args.log_dir}/{now}.{int(time.time())}'
+    out_dir = args.out_dir
+    fmt = args.name_format
+    
+    print(f'[Hyena] Training Setting')
+    print(f'  Image Width   = {w}')
+    print(f'  Image Height  = {h}')
+    print(f'  Latent Ch     = {d}')
+    print(f'  Latent Shape  = ({d}, {h*w})')
+    print(f'  Batch Size    = {b}')
+    print(f'  Lr            = {lr}')
+    print(f'  Epochs        = {n}')
+    print(f'  Saving epochs = {s}')
+    print(f'  Log dir       = {log_dir}')
+    print(f'  Out dir       = {out_dir}')
+    print(f'  Name format   = {fmt}')
+
+    os.makedirs(log_dir, exist_ok=False)
+    os.makedirs(out_dir, exist_ok=True)
+    
+    hyena = Hyena(d, h * w)
     dataset = MyDataset('data')
+    conf = TrainConf(b, lr, n, s, log_dir, out_dir, fmt)
+    
+    logger = SummaryWriter(log_dir=log_dir)
+    
     with torch.autocast(device_type='cuda', dtype=torch.float16):
-        train(hyena, 16, 1e-2, 100, dataset)
+        train(hyena, conf, dataset, logger)
