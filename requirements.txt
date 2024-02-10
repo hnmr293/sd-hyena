@@ -6,6 +6,7 @@ pandas
 matplotlib
 seaborn
 tensorboard
+diffusers
 
 # for WSL environment
 #PyQt5
