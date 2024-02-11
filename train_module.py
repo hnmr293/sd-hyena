@@ -97,7 +97,8 @@ def train(mod: torch.nn.Module, teacher: torch.nn.Module, conf: TrainConf, logge
     mod.train()
 
     teacher = teacher.to('cuda')
-    teacher.requires_grad_(False)
+    for tp in teacher.parameters():
+        tp.grad = None
     
     params = list(mod.parameters())
     optimizer = torch.optim.AdamW(params, lr)
@@ -214,4 +215,5 @@ if __name__ == '__main__':
     logger.add_hparams(vars(args), {})
     
     with torch.autocast(device_type='cuda', dtype=torch.float16):
+        #torch.backends.cudnn.benchmark = True
         train(hyena, teacher, conf, logger)
