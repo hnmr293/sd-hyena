@@ -22,6 +22,11 @@ class TrainConf:
     width: int
     height: int
     channels: int
+    hyena_order: int
+    hyena_filter_order: int
+    hyena_num_blocks: int
+    hyena_num_heads: int
+    hyena_short_filter_order: int
 
 
 def init_seed(seed: int):
@@ -161,6 +166,11 @@ if __name__ == '__main__':
     p.add_argument('-f', '--name_format', type=str, default='Hyena-{s:05d}')
     p.add_argument('-d', '--seed', type=int, default=-1)
     p.add_argument('-p', '--pretrained_weight', type=str, default='')
+    p.add_argument('--hyena_order', type=int, default=2)
+    p.add_argument('--hyena_filter_order', type=int, default=64)
+    p.add_argument('--hyena_num_blocks', type=int, default=1)
+    p.add_argument('--hyena_num_heads', type=int, default=1)
+    p.add_argument('--hyena_short_filter_order', type=int, default=3)
     args = p.parse_args()
 
     target = args.target.upper()
@@ -185,9 +195,29 @@ if __name__ == '__main__':
     out_dir = args.out_dir
     fmt = args.name_format
     
+    os.makedirs(log_dir, exist_ok=False)
+    os.makedirs(out_dir, exist_ok=True)
+    
+    conf = TrainConf(target, b, lr, n, s, log_dir, out_dir, fmt, seed, w, h, d,
+                     args.hyena_order,
+                     args.hyena_filter_order,
+                     args.hyena_num_blocks,
+                     args.hyena_num_heads,
+                     args.hyena_short_filter_order,
+    )
+    
+    hyena = Hyena(d, h * w,
+                  order=args.hyena_order,
+                  filter_order=args.hyena_filter_order,
+                  num_blocks=args.hyena_num_blocks,
+                  num_heads=args.hyena_num_heads,
+                  short_filter_order=args.hyena_short_filter_order,
+    )
+    
     print(f'[Hyena] Training Setting')
     print(f'  Image Width   = {iw}')
     print(f'  Image Height  = {ih}')
+    print(f'  Teacher Model = {args.teacher_model}')
     print(f'  Target        = {target}')
     print(f'  Latent Shape  = ({h*w}, {d})')
     print(f'  Batch Size    = {b}')
@@ -197,13 +227,15 @@ if __name__ == '__main__':
     print(f'  Log dir       = {log_dir}')
     print(f'  Out dir       = {out_dir}')
     print(f'  Name format   = {fmt}')
-
-    os.makedirs(log_dir, exist_ok=False)
-    os.makedirs(out_dir, exist_ok=True)
-    
-    conf = TrainConf(target, b, lr, n, s, log_dir, out_dir, fmt, seed, w, h, d)
-    
-    hyena = Hyena(d, h * w)
+    print(f'  Seed          = {seed}')
+    print(f'  Pretrained    = {args.pretrained_weight}')
+    print(f'')
+    print(f'[Hyena] Module Setting')
+    print(f'  Order        = {args.hyena_order}')
+    print(f'  Filter order = {args.hyena_filter_order}')
+    print(f'  Num blovks   = {args.hyena_num_blocks}')
+    print(f'  Num heads    = {args.hyena_num_heads}')
+    print(f'  Short Filter = {args.hyena_short_filter_order}')
     
     if len(args.pretrained_weight) != 0:
         hyena = hyena.half()
