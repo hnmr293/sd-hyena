@@ -109,8 +109,18 @@ class AttentionSDP(Attention):
             return out
 
 class Hyena(HyenaOperator):
-    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3) -> None:
-        super().__init__(d_model=input_dim, l_max=max_len, order=order, filter_order=filter_order, num_heads=num_heads, inner_factor=inner_factor, num_blocks=num_blocks, short_filter_order=short_filter_order)
+    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3, fused_bias_fc=True) -> None:
+        super().__init__(
+            d_model=input_dim,
+            l_max=max_len,
+            order=order,
+            filter_order=filter_order,
+            num_heads=num_heads,
+            inner_factor=inner_factor,
+            num_blocks=num_blocks,
+            short_filter_order=short_filter_order,
+            fused_bias_fc=fused_bias_fc,
+        )
     
     def forward(self, x, ctx=None):
         assert ctx is None
@@ -120,8 +130,18 @@ class Hyena(HyenaOperator):
 class HyenaProcessor(HyenaOperator):
     """for diffusers"""
 
-    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3) -> None:
-        super().__init__(d_model=input_dim, l_max=max_len, order=order, filter_order=filter_order, num_heads=num_heads, inner_factor=inner_factor, num_blocks=num_blocks, short_filter_order=short_filter_order)
+    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3, fused_bias_fc=True) -> None:
+        super().__init__(
+            d_model=input_dim,
+            l_max=max_len,
+            order=order,
+            filter_order=filter_order,
+            num_heads=num_heads,
+            inner_factor=inner_factor,
+            num_blocks=num_blocks,
+            short_filter_order=short_filter_order,
+            fused_bias_fc=fused_bias_fc,
+        )
     
     def forward(
         self,
