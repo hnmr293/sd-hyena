@@ -8,5 +8,8 @@ seaborn
 tensorboard
 diffusers
 
+# torch
+# xformers
+
 # for WSL environment
 #PyQt5
