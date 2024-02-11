@@ -2,28 +2,8 @@ import torch
 from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
 import safetensors.torch
 
-from mods import HyenaProcessor
+from mods import HyenaProcessor, ATTN_MAP
 
-
-ATTN_MAP = {
-    # attn: down_blocks[i].attentions[j].transformer_blocks[k]
-    'IN01': [0, 0, 0],
-    'IN02': [0, 1, 0],
-    'IN04': [1, 0, 0],
-    'IN05': [1, 1, 0],
-    'IN07': [2, 0, 0],
-    'IN08': [2, 1, 0],
-    'M00':  [0, 0, 0],
-    'OUT03': [1, 0, 0],
-    'OUT04': [1, 1, 0],
-    'OUT05': [1, 2, 0],
-    'OUT06': [2, 0, 0],
-    'OUT07': [2, 1, 0],
-    'OUT08': [2, 2, 0],
-    'OUT09': [3, 0, 0],
-    'OUT10': [3, 1, 0],
-    'OUT11': [3, 2, 0],
-}
 
 def load_model(model_path: str):
     pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
@@ -39,11 +19,18 @@ def load_model(model_path: str):
     return pipe
 
 def replace_hyena(target: str, unet, hyena_path: str):
-    hyena = HyenaProcessor(320, 64*64).half()
+    target = target.upper()
+    info = ATTN_MAP[target]
+    
+    b, a, t = info.diffusers_block_index, info.diffusers_attn_index, info.diffusers_transformer_index
+    m, d = info.multiplier, info.input_channels
+    w = 512 // m
+    h = 512 // m
+    
+    hyena = HyenaProcessor(d, h*w).half()
     safetensors.torch.load_model(hyena, hyena_path)
     hyena = hyena.to('cuda')
     
-    target = target.upper()
     blocks = None
     if target.startswith('IN'):
         blocks = unet.down_blocks
@@ -54,7 +41,6 @@ def replace_hyena(target: str, unet, hyena_path: str):
     else:
         raise ValueError(f'unknown target: {target}')
     
-    b, a, t = ATTN_MAP[target]
     mod = blocks[b].attentions[a].transformer_blocks[t]
     mod.attn1.processor = hyena
 
@@ -79,7 +65,7 @@ if __name__ == '__main__':
     
     p = argparse.ArgumentParser()
     p.add_argument('-m', '--model', type=str, required=True)
-    p.add_argument('-t', '--target', type=str, choices=['IN01', 'IN02', 'IN04', 'IN05', 'IN07', 'IN08', 'M00', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'OUT09', 'OUT10', 'OUT11'], default='IN01')
+    p.add_argument('-t', '--target', type=str, choices=list(ATTN_MAP.keys()), default='IN01')
     p.add_argument('-y', '--hyena', type=str, default='')
     p.add_argument('-p', '--prompt', type=str, required=True)
     p.add_argument('-q', '--negative_prompt', type=str, default='')

@@ -1,4 +1,5 @@
 from typing import Optional
+import dataclasses
 
 import torch
 import einops
@@ -133,3 +134,50 @@ class HyenaProcessor(HyenaOperator):
     ) -> torch.Tensor:
         assert encoder_hidden_states is None
         return super().forward(hidden_states)
+
+
+@dataclasses.dataclass
+class AttnMap:
+    diffusers_block_index: int
+    diffusers_attn_index: int
+    diffusers_transformer_index: int
+    multiplier: int
+    input_channels: int
+    output_channels: int
+    name: str
+
+ATTN_MAP: dict[str,AttnMap] = {
+    #             v            v                    v
+    # down_blocks.0.attentions.0.transformer_blocks.0.attn1 (2, 4096, 320) (2, 4096, 320)
+    # down_blocks.0.attentions.1.transformer_blocks.0.attn1 (2, 4096, 320) (2, 4096, 320)
+    # down_blocks.1.attentions.0.transformer_blocks.0.attn1 (2, 1024, 640) (2, 1024, 640)
+    # down_blocks.1.attentions.1.transformer_blocks.0.attn1 (2, 1024, 640) (2, 1024, 640)
+    # down_blocks.2.attentions.0.transformer_blocks.0.attn1 (2, 256, 1280) (2, 256, 1280)
+    # down_blocks.2.attentions.1.transformer_blocks.0.attn1 (2, 256, 1280) (2, 256, 1280)
+    # mid_block.attentions.0.transformer_blocks.0.attn1 (2, 64, 1280) (2, 64, 1280)
+    # up_blocks.1.attentions.0.transformer_blocks.0.attn1 (2, 256, 1280) (2, 256, 1280)
+    # up_blocks.1.attentions.1.transformer_blocks.0.attn1 (2, 256, 1280) (2, 256, 1280)
+    # up_blocks.1.attentions.2.transformer_blocks.0.attn1 (2, 256, 1280) (2, 256, 1280)
+    # up_blocks.2.attentions.0.transformer_blocks.0.attn1 (2, 1024, 640) (2, 1024, 640)
+    # up_blocks.2.attentions.1.transformer_blocks.0.attn1 (2, 1024, 640) (2, 1024, 640)
+    # up_blocks.2.attentions.2.transformer_blocks.0.attn1 (2, 1024, 640) (2, 1024, 640)
+    # up_blocks.3.attentions.0.transformer_blocks.0.attn1 (2, 4096, 320) (2, 4096, 320)
+    # up_blocks.3.attentions.1.transformer_blocks.0.attn1 (2, 4096, 320) (2, 4096, 320)
+    # up_blocks.3.attentions.2.transformer_blocks.0.attn1 (2, 4096, 320) (2, 4096, 320)
+    'IN01': AttnMap(0, 0, 0, 8, 320, 320, 'model.diffusion_model.input_blocks.1.1.transformer_blocks.0.attn1'),
+    'IN02': AttnMap(0, 1, 0, 8, 320, 320, 'model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn1'),
+    'IN04': AttnMap(1, 0, 0, 16, 640, 640, 'model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn1'),
+    'IN05': AttnMap(1, 1, 0, 16, 640, 640, 'model.diffusion_model.input_blocks.5.1.transformer_blocks.0.attn1'),
+    'IN07': AttnMap(2, 0, 0, 32, 1280, 1280, 'model.diffusion_model.input_blocks.7.1.transformer_blocks.0.attn1'),
+    'IN08': AttnMap(2, 1, 0, 32, 1280, 1280, 'model.diffusion_model.input_blocks.8.1.transformer_blocks.0.attn1'),
+    'M00': AttnMap(0, 0, 0, 64, 1280, 1280, 'model.diffusion_model.middle_block.1.transformer_blocks.0.attn1'),
+    'OUT03': AttnMap(1, 0, 0, 32, 1280, 1280, 'model.diffusion_model.output_blocks.3.1.transformer_blocks.0.attn1'),
+    'OUT04': AttnMap(1, 1, 0, 32, 1280, 1280, 'model.diffusion_model.output_blocks.4.1.transformer_blocks.0.attn1'),
+    'OUT05': AttnMap(1, 2, 0, 32, 1280, 1280, 'model.diffusion_model.output_blocks.5.1.transformer_blocks.0.attn1'),
+    'OUT06': AttnMap(2, 0, 0, 16, 640, 640, 'model.diffusion_model.output_blocks.6.1.transformer_blocks.0.attn1'),
+    'OUT07': AttnMap(2, 1, 0, 16, 640, 640, 'model.diffusion_model.output_blocks.7.1.transformer_blocks.0.attn1'),
+    'OUT08': AttnMap(2, 2, 0, 16, 640, 640, 'model.diffusion_model.output_blocks.8.1.transformer_blocks.0.attn1'),
+    'OUT09': AttnMap(3, 0, 0, 8, 320, 320, 'model.diffusion_model.output_blocks.9.1.transformer_blocks.0.attn1'),
+    'OUT10': AttnMap(3, 1, 0, 8, 320, 320, 'model.diffusion_model.output_blocks.10.1.transformer_blocks.0.attn1'),
+    'OUT11': AttnMap(3, 2, 0, 8, 320, 320, 'model.diffusion_model.output_blocks.11.1.transformer_blocks.0.attn1'),
+}

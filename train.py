@@ -6,7 +6,7 @@ import tqdm
 import safetensors.torch
 #from prodigyopt import Prodigy
 
-from mods import Hyena, AttentionSDP
+from mods import Hyena, AttentionSDP, ATTN_MAP
 
 @dataclasses.dataclass
 class TrainConf:
@@ -48,30 +48,11 @@ def save(mod: torch.nn.Module, path: str, n_step: int):
     }
     safetensors.torch.save_model(mod, path, meta)
 
-ATTN_MAP = {
-    'IN01': 'input_blocks.1',
-    'IN02': 'input_blocks.2',
-    'IN04': 'input_blocks.4',
-    'IN05': 'input_blocks.5',
-    'IN07': 'input_blocks.7',
-    'IN08': 'input_blocks.8',
-    'M00': 'middle_block',
-    'OUT03': 'output_blocks.3',
-    'OUT04': 'output_blocks.4',
-    'OUT05': 'output_blocks.5',
-    'OUT06': 'output_blocks.6',
-    'OUT07': 'output_blocks.7',
-    'OUT08': 'output_blocks.8',
-    'OUT09': 'output_blocks.9',
-    'OUT10': 'output_blocks.10',
-    'OUT11': 'output_blocks.11',
-}
-
 def load_teacher_model(path: str, target: str, conf: TrainConf):
     sd = safetensors.torch.load_file(path)
 
     target = target.upper()
-    KEY = f'model.diffusion_model.{ATTN_MAP[target]}.1.transformer_blocks.0.attn1.'
+    KEY = ATTN_MAP[target].name + '.'
     
     def repr(key: str):
         if not key.startswith(KEY):
@@ -158,13 +139,12 @@ if __name__ == '__main__':
     
     p = argparse.ArgumentParser()
     p.add_argument('-m', '--teacher_model', type=str, required=True)
-    p.add_argument('-t', '--target', type=str, choices=['IN01', 'IN02', 'IN04', 'IN05', 'IN07', 'IN08', 'M00', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'OUT09', 'OUT10', 'OUT11'], default='IN01')
+    p.add_argument('-t', '--target', type=str, choices=list(ATTN_MAP.keys()), default='IN01')
     p.add_argument('-b', '--batch_size', type=int, default=16)
     p.add_argument('-r', '--lr', type=float, default=1e-5)
     p.add_argument('-n', '--n_steps', type=int, default=200)
-    p.add_argument('-c', '--channels', type=int, default=320)
-    p.add_argument('-W', '--width', type=int, default=64)
-    p.add_argument('-H', '--height', type=int, default=64)
+    p.add_argument('-W', '--width', type=int, default=512)
+    p.add_argument('-H', '--height', type=int, default=512)
     p.add_argument('-s', '--save_every_n_steps', type=int, default=40)
     p.add_argument('-l', '--log_dir', type=str, default='logs')
     p.add_argument('-o', '--out_dir', type=str, default='out')
@@ -173,10 +153,16 @@ if __name__ == '__main__':
     p.add_argument('-p', '--pretrained_weight', type=str, default='')
     args = p.parse_args()
 
-    target = args.target
-    d = args.channels
-    w = args.width
-    h = args.height
+    target = args.target.upper()
+
+    attn = ATTN_MAP[target]
+    assert args.width % attn.multiplier == 0
+    assert args.height % attn.multiplier == 0
+    iw = args.width
+    ih = args.height
+    w = iw // attn.multiplier
+    h = ih // attn.multiplier
+    d = attn.input_channels
     
     b = args.batch_size
     lr = args.lr
@@ -190,11 +176,10 @@ if __name__ == '__main__':
     fmt = args.name_format
     
     print(f'[Hyena] Training Setting')
-    print(f'  Image Width   = {w}')
-    print(f'  Image Height  = {h}')
-    print(f'  Latent Ch     = {d}')
-    print(f'  Latent Shape  = ({d}, {h*w})')
+    print(f'  Image Width   = {iw}')
+    print(f'  Image Height  = {ih}')
     print(f'  Target        = {target}')
+    print(f'  Latent Shape  = ({h*w}, {d})')
     print(f'  Batch Size    = {b}')
     print(f'  Lr            = {lr}')
     print(f'  Steps         = {n}')
