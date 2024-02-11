@@ -10,5 +10,3 @@ diffusers
 
 # for WSL environment
 #PyQt5
-
--e .
