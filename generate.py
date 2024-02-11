@@ -107,11 +107,16 @@ if __name__ == '__main__':
     pipe = load_model(args.model)
     pipe = pipe.to('cuda')
     
-    for k, hyena_path in enumerate(args.hyena.split(',')):
-        hyena_path = hyena_path.strip()
-        if len(hyena_path) == 0:
-            continue
-        replace_hyena(args.target, pipe.unet, hyena_path, args.width, args.height)
+    hyenas = args.hyena.split(',')
+    if len(hyenas) == 0 or (len(hyenas) == 1 and hyenas[0] == ''):
+        hyenas = [None]
+    
+    for k, hyena_path in enumerate(hyenas):
+        if hyena_path is not None:
+            hyena_path = hyena_path.strip()
+            if len(hyena_path) == 0:
+                continue
+            replace_hyena(args.target, pipe.unet, hyena_path, args.width, args.height)
         
         images = generate(args.iteration, pipe, gen_args, args.seed)
         
