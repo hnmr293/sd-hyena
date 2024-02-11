@@ -10,6 +10,7 @@ from mods import Hyena, AttentionSDP, ATTN_MAP
 
 @dataclasses.dataclass
 class TrainConf:
+    target: str
     batch_size: int
     lr: float
     n_steps: int
@@ -37,9 +38,17 @@ def init_seed(seed: int):
     #torch.backends.cudnn.deterministic = True
     torch.cuda.manual_seed(seed)
 
-def save(mod: torch.nn.Module, path: str, n_step: int):
+def save(mod: torch.nn.Module, path: str, n_step: int, conf: TrainConf):
     meta = {
         'global_step': n_step,
+        'target': conf.target,
+        'batch_size': conf.batch_size,
+        'lr': conf.lr,
+        'save_every_n_steps': conf.save_every_n_steps,
+        'train_seed': conf.train_seed,
+        'train_width': conf.width,
+        'train_height': conf.height,
+        'train_channels': conf.channels,
     }
     meta = {
         str(k): str(v)
@@ -128,7 +137,7 @@ def train(mod: torch.nn.Module, teacher: torch.nn.Module, conf: TrainConf, logge
         if (global_steps + 1 == total_steps) or (0 < save_step and (global_steps + 1) % save_step == 0):
             outname = fmt.format(s=global_steps+1)
             path = f'{out_dir}/{outname}.safetensors'
-            save(mod, path, global_steps+1)
+            save(mod, path, global_steps+1, conf)
 
 
 if __name__ == '__main__':
@@ -191,7 +200,7 @@ if __name__ == '__main__':
     os.makedirs(log_dir, exist_ok=False)
     os.makedirs(out_dir, exist_ok=True)
     
-    conf = TrainConf(b, lr, n, s, log_dir, out_dir, fmt, seed, w, h, d)
+    conf = TrainConf(target, b, lr, n, s, log_dir, out_dir, fmt, seed, w, h, d)
     
     hyena = Hyena(d, h * w)
     
