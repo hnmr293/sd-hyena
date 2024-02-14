@@ -18,17 +18,17 @@ def load_model(model_path: str):
 
     return pipe
 
-def replace_hyena(target: str, unet, hyena_path: str, image_width: int, image_height: int):
+def replace_hyena(target: str, unet, hyena_path: str):
     target = target.upper()
     info = ATTN_MAP[target]
     
     b, a, t = info.diffusers_block_index, info.diffusers_attn_index, info.diffusers_transformer_index
-    m, d = info.multiplier, info.input_channels
-    assert image_width % m == 0
-    assert image_height % m == 0
     
-    w = image_width // m
-    h = image_height // m
+    with safetensors.safe_open(hyena_path, framework='pt') as f:
+        meta = f.metadata()
+    w = int(meta['train_width'])
+    h = int(meta['train_height'])
+    d = int(meta['train_channels'])
     
     hyena = HyenaProcessor(d, h*w).half()
     safetensors.torch.load_model(hyena, hyena_path)
@@ -116,7 +116,7 @@ if __name__ == '__main__':
             hyena_path = hyena_path.strip()
             if len(hyena_path) == 0:
                 continue
-            replace_hyena(args.target, pipe.unet, hyena_path, args.width, args.height)
+            replace_hyena(args.target, pipe.unet, hyena_path)
         
         images = generate(args.iteration, pipe, gen_args, args.seed)
         
