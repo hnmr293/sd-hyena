@@ -2,8 +2,7 @@
 
 Stable-diffusion self-attention layers replacement with [Hyena](https://github.com/HazyResearch/safari).
 
-![cover 1](assets/cover.png)
-![cover 2](assets/Figure_2b.jpg)
+![cover](assets/cover.png)
 
 ## Installation
 
@@ -115,11 +114,9 @@ batch size: 1
 image size: 2048x2048
 ```
 
-### Inference time of the performance-critical layer
+### Replacing layers which has a significant impact on performance
 
-![benchmark 3: performance of SDP and Hyena](assets/Figure_2a.jpg)
-
-![benchmark 4: generation time of 2048x2048 image.](assets/Figure_2b.jpg)
+![benchmark 3: performance of SDP and Hyena](assets/Figure_2.png)
 
 The computational complexity of the self-attention is proportional to the square of the context length. When the size of the generating image is `(w, h)`, the input size of the self-attention layer for `IN01`, `IN02`, `OUT09`, `OUT10`, and `OUT11` will be `(320, w//8 * h//8)`, and the context length is more than 4 times larger than the other self-attention layers. Therefore, these layers are likely to become performance bottlenecks. So I replaced these layers with Hyena. As a result, performance was extremely improved.
 
