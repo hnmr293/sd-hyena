@@ -1,6 +1,6 @@
 # Stable Diffusion with Hyena
 
-Stable-diffusion self-attention layers replacement with [Hyena](https://github.com/HazyResearch/safari).
+Replacing self-attention layers with [Hyena](https://github.com/HazyResearch/safari) to improve performance.
 
 ![cover](assets/cover.png)
 
@@ -32,7 +32,7 @@ $ . .venv/bin/activate
 
 ## Training
 
-See `examples/train.sh`.
+See [`examples/train.sh`](examples/train.sh).
 
 ### Training options
 
@@ -54,7 +54,7 @@ See `examples/train.sh`.
 
 ## Generation
 
-See `examples/generate.sh`.
+See [`examples/generate.sh`](examples/generate.sh).
 
 ### Generation options
 
