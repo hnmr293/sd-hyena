@@ -5,6 +5,7 @@ import dataclasses
 import torch
 
 from mods import Attention, AttentionSDP, AttentionXFormers, Hyena
+from utils import cuda_profiler
 
 @dataclasses.dataclass
 class Profs:
@@ -16,28 +17,6 @@ def mean_and_stdev(xs: list):
     mean = statistics.fmean(xs)
     stdev = statistics.stdev(xs)
     return mean, stdev
-
-@contextlib.contextmanager
-def cuda_profiler(device='cuda'):
-    cuda_start = torch.cuda.Event(enable_timing=True)
-    cuda_end = torch.cuda.Event(enable_timing=True)
-
-    obj = {}
-    
-    torch.cuda.synchronize()
-    torch.cuda.reset_peak_memory_stats(device)
-    cuda_start.record()
-    
-    try:
-        yield obj
-    finally:
-        pass
-
-    cuda_end.record()
-    torch.cuda.synchronize()
-    obj['time'] = cuda_start.elapsed_time(cuda_end)
-    obj['memory'] = torch.cuda.max_memory_allocated(device)
-
 
 def n_params(mod: torch.nn.Module):
     n = 0

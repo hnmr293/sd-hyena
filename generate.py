@@ -1,54 +1,11 @@
 import torch
-from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
-import safetensors.torch
 
-from mods import HyenaProcessor, ATTN_MAP
-
-
-def load_model(model_path: str):
-    pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
-        model_path,
-        torch_dtype=torch.float16,
-        safety_checker=None,
-        #local_files_only=True,
-        cache_dir='.cache',
-    )
-
-    pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
-
-    return pipe
-
-def replace_hyena(target: str, unet, hyena_path: str):
-    target = target.upper()
-    info = ATTN_MAP[target]
-    
-    b, a, t = info.diffusers_block_index, info.diffusers_attn_index, info.diffusers_transformer_index
-    
-    with safetensors.safe_open(hyena_path, framework='pt') as f:
-        meta = f.metadata()
-    w = int(meta['train_width'])
-    h = int(meta['train_height'])
-    d = int(meta['train_channels'])
-    
-    hyena = HyenaProcessor(d, h*w).half()
-    safetensors.torch.load_model(hyena, hyena_path)
-    hyena = hyena.to('cuda')
-    
-    blocks = None
-    if target.startswith('IN'):
-        blocks = unet.down_blocks
-    elif target.startswith('M'):
-        blocks = [unet.mid_block]
-    elif target.startswith('OUT'):
-        blocks = unet.up_blocks
-    else:
-        raise ValueError(f'unknown target: {target}')
-    
-    mod = blocks[b].attentions[a].transformer_blocks[t]
-    mod.attn1.processor = hyena
+from utils import init_seed, load_pipeline, replace_hyena, ATTN_MAP
 
 
 def generate(iteration: int, pipe, gen_args: dict, seed: int):
+    init_seed(seed)
+    
     generator = torch.Generator(device='cuda')
     if 0 <= seed:
         generator = generator.manual_seed(seed)
@@ -104,7 +61,7 @@ if __name__ == '__main__':
     
     os.makedirs(args.out_dir, exist_ok=True)
 
-    pipe = load_model(args.model)
+    pipe = load_pipeline(args.model)
     pipe = pipe.to('cuda')
     
     hyenas = args.hyena.split(',')

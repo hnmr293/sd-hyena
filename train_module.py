@@ -6,6 +6,7 @@ import tqdm
 import safetensors.torch
 #from prodigyopt import Prodigy
 
+from utils import init_seed
 from mods import Hyena, AttentionSDP, ATTN_MAP
 
 @dataclasses.dataclass
@@ -28,20 +29,6 @@ class TrainConf:
     hyena_num_heads: int
     hyena_short_filter_order: int
 
-
-def init_seed(seed: int):
-    import random
-    import numpy
-    
-    if seed < 0:
-        return
-    
-    random.seed(seed)
-    numpy.random.seed(seed)
-    torch.manual_seed(seed)
-    #torch.backends.cudnn.benchmark = False
-    #torch.backends.cudnn.deterministic = True
-    torch.cuda.manual_seed(seed)
 
 def save(mod: torch.nn.Module, path: str, n_step: int, conf: TrainConf):
     meta = {
