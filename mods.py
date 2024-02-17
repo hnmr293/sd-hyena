@@ -109,7 +109,7 @@ class AttentionSDP(Attention):
             return out
 
 class Hyena(HyenaOperator):
-    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3, fused_bias_fc=True) -> None:
+    def __init__(self, input_dim=320, max_len=64*64, order=2, filter_order=64, num_heads=1, inner_factor=1, num_blocks=1, short_filter_order=3, fused_bias_fc=False) -> None:
         super().__init__(
             d_model=input_dim,
             l_max=max_len,
